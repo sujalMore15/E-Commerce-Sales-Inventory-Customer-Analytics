@@ -1,1 +1,1060 @@
 
+from pathlib import Path
+
+code = r'''# ============================================================
+# MARKETPLACE ANALYTICS & INVENTORY INTELLIGENCE PROJECT
+# Python Data Preparation, Cleaning, Analysis & Export
+# ============================================================
+#
+# Dataset files:
+#   users.csv
+#   vendors.csv
+#   products.csv
+#   orders.csv
+#   order_items.csv
+#   reviews.csv
+#
+# Main Python libraries:
+#   pandas, numpy, matplotlib, seaborn, openpyxl
+#
+# NOTE:
+# This Python module prepares and analyzes the marketplace data.
+# SQL is used for database querying and Power BI/DAX is used for
+# interactive dashboard KPIs and visualizations.
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. IMPORT LIBRARIES
+# ------------------------------------------------------------
+
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Optional visualization library
+import seaborn as sns
+
+
+# ------------------------------------------------------------
+# 2. PROJECT PATH
+# ------------------------------------------------------------
+
+DATA_DIR = Path(r"./data")
+OUTPUT_DIR = Path(r"./output")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+print("Data folder:", DATA_DIR.resolve())
+print("Output folder:", OUTPUT_DIR.resolve())
+
+
+# ------------------------------------------------------------
+# 3. LOAD CSV FILES
+# ------------------------------------------------------------
+
+files = {
+    "users": "users.csv",
+    "vendors": "vendors.csv",
+    "products": "products.csv",
+    "orders": "orders.csv",
+    "order_items": "order_items.csv",
+    "reviews": "reviews.csv",
+}
+
+data = {}
+
+for table_name, file_name in files.items():
+    file_path = DATA_DIR / file_name
+
+    if file_path.exists():
+        data[table_name] = pd.read_csv(file_path)
+        print(f"{table_name:15} -> {data[table_name].shape}")
+    else:
+        print(f"WARNING: File not found -> {file_path}")
+
+
+# Access individual DataFrames
+users = data.get("users", pd.DataFrame())
+vendors = data.get("vendors", pd.DataFrame())
+products = data.get("products", pd.DataFrame())
+orders = data.get("orders", pd.DataFrame())
+order_items = data.get("order_items", pd.DataFrame())
+reviews = data.get("reviews", pd.DataFrame())
+
+
+# ------------------------------------------------------------
+# 4. INSPECT DATA
+# ------------------------------------------------------------
+
+for name, df in data.items():
+    print("\n" + "=" * 60)
+    print(name.upper())
+    print("=" * 60)
+    print(df.head())
+    print("\nColumns:")
+    print(df.columns.tolist())
+    print("\nData types:")
+    print(df.dtypes)
+    print("\nMissing values:")
+    print(df.isnull().sum())
+
+
+# ------------------------------------------------------------
+# 5. STANDARDIZE COLUMN NAMES
+# ------------------------------------------------------------
+
+def clean_column_names(df):
+    df = df.copy()
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_", regex=False)
+    )
+    return df
+
+
+for name in list(data.keys()):
+    data[name] = clean_column_names(data[name])
+
+users = data.get("users", users)
+vendors = data.get("vendors", vendors)
+products = data.get("products", products)
+orders = data.get("orders", orders)
+order_items = data.get("order_items", order_items)
+reviews = data.get("reviews", reviews)
+
+
+# ------------------------------------------------------------
+# 6. REMOVE DUPLICATES
+# ------------------------------------------------------------
+
+for name in list(data.keys()):
+    before = len(data[name])
+    data[name] = data[name].drop_duplicates()
+    after = len(data[name])
+
+    print(
+        f"{name}: removed {before - after:,} duplicate rows; "
+        f"remaining = {after:,}"
+    )
+
+users = data.get("users", users)
+vendors = data.get("vendors", vendors)
+products = data.get("products", products)
+orders = data.get("orders", orders)
+order_items = data.get("order_items", order_items)
+reviews = data.get("reviews", reviews)
+
+
+# ------------------------------------------------------------
+# 7. CONVERT DATE COLUMNS
+# ------------------------------------------------------------
+
+date_columns = {
+    "users": ["registration_date"],
+    "vendors": ["created_date"],
+    "products": ["created_date"],
+    "orders": ["order_date", "created_at"],
+    "order_items": [],
+    "reviews": ["created_date"],
+}
+
+for table_name, columns in date_columns.items():
+    df = data.get(table_name)
+
+    if df is None or df.empty:
+        continue
+
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    data[table_name] = df
+
+
+users = data.get("users", users)
+vendors = data.get("vendors", vendors)
+products = data.get("products", products)
+orders = data.get("orders", orders)
+order_items = data.get("order_items", order_items)
+reviews = data.get("reviews", reviews)
+
+
+# ------------------------------------------------------------
+# 8. NUMERIC DATA CLEANING
+# ------------------------------------------------------------
+
+numeric_columns = {
+    "products": [
+        "price",
+        "cost_price",
+        "stock",
+        "vendor_id",
+    ],
+    "orders": [
+        "total_amount",
+        "discount_amount",
+        "final_amount",
+        "user_id",
+    ],
+    "order_items": [
+        "quantity",
+        "unit_price",
+        "discount_percent",
+        "total_price",
+        "vendor_id",
+        "product_id",
+        "order_id",
+    ],
+    "reviews": [
+        "rating",
+        "helpful_count",
+        "product_id",
+        "user_id",
+        "order_id",
+    ],
+}
+
+for table_name, columns in numeric_columns.items():
+    df = data.get(table_name)
+
+    if df is None or df.empty:
+        continue
+
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    data[table_name] = df
+
+
+products = data.get("products", products)
+orders = data.get("orders", orders)
+order_items = data.get("order_items", order_items)
+reviews = data.get("reviews", reviews)
+
+
+# ------------------------------------------------------------
+# 9. HANDLE MISSING VALUES
+# ------------------------------------------------------------
+
+for name, df in data.items():
+    print(f"\nMissing-value report: {name}")
+    print(df.isnull().sum())
+
+
+# Numeric columns can be filled with median where appropriate.
+for df in [products, orders, order_items, reviews]:
+    if df.empty:
+        continue
+
+    numeric_cols = df.select_dtypes(include=np.number).columns
+
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna(df[col].median())
+
+
+# ------------------------------------------------------------
+# 10. BASIC DATA QUALITY CHECKS
+# ------------------------------------------------------------
+
+def data_quality_report(df, name):
+    report = pd.DataFrame({
+        "column": df.columns,
+        "data_type": df.dtypes.astype(str).values,
+        "missing_values": df.isnull().sum().values,
+        "unique_values": df.nunique().values,
+    })
+
+    report["missing_percent"] = (
+        report["missing_values"] / max(len(df), 1) * 100
+    )
+
+    print(f"\nDATA QUALITY REPORT: {name}")
+    print(report)
+
+    return report
+
+
+quality_reports = {}
+
+for name, df in data.items():
+    quality_reports[name] = data_quality_report(df, name)
+
+
+# ------------------------------------------------------------
+# 11. PRODUCTS ANALYSIS
+# ------------------------------------------------------------
+
+if not products.empty:
+
+    total_products = products["product_id"].nunique()
+    total_stock = products["stock"].sum()
+    avg_product_price = products["price"].mean()
+    min_product_price = products["price"].min()
+    max_product_price = products["price"].max()
+
+    print("\nPRODUCT METRICS")
+    print("Total products:", total_products)
+    print("Total stock:", total_stock)
+    print("Average product price:", avg_product_price)
+    print("Minimum product price:", min_product_price)
+    print("Maximum product price:", max_product_price)
+
+
+# ------------------------------------------------------------
+# 12. INVENTORY STATUS
+# ------------------------------------------------------------
+
+if not products.empty and "stock" in products.columns:
+
+    products["inventory_status"] = np.where(
+        products["stock"] < 20,
+        "Low Stock",
+        "Available"
+    )
+
+    low_stock_products = (
+        products.loc[products["stock"] < 20]
+        .copy()
+        .sort_values("stock")
+    )
+
+    out_of_stock_products = (
+        products.loc[products["stock"] <= 0]
+        .copy()
+    )
+
+    low_stock_count = (products["stock"] < 20).sum()
+    out_of_stock_count = (products["stock"] <= 0).sum()
+
+    print("\nINVENTORY METRICS")
+    print("Low stock products:", low_stock_count)
+    print("Out of stock products:", out_of_stock_count)
+
+else:
+    low_stock_products = pd.DataFrame()
+    out_of_stock_products = pd.DataFrame()
+
+
+# ------------------------------------------------------------
+# 13. INVENTORY VALUE
+# ------------------------------------------------------------
+
+if not products.empty:
+
+    products["inventory_value"] = (
+        products["price"] * products["stock"]
+    )
+
+    total_inventory_value = products["inventory_value"].sum()
+
+    print("Total inventory value:", total_inventory_value)
+
+
+# ------------------------------------------------------------
+# 14. CATEGORY ANALYSIS
+# ------------------------------------------------------------
+
+if not products.empty and "category" in products.columns:
+
+    category_summary = (
+        products.groupby("category")
+        .agg(
+            products=("product_id", "nunique"),
+            stock=("stock", "sum"),
+            average_price=("price", "mean"),
+            inventory_value=("inventory_value", "sum"),
+        )
+        .reset_index()
+        .sort_values("inventory_value", ascending=False)
+    )
+
+    print("\nCATEGORY SUMMARY")
+    print(category_summary)
+
+
+# ------------------------------------------------------------
+# 15. ORDER ANALYSIS
+# ------------------------------------------------------------
+
+if not orders.empty:
+
+    total_orders = orders["order_id"].nunique()
+
+    if "user_id" in orders.columns:
+        total_customers = orders["user_id"].nunique()
+    else:
+        total_customers = np.nan
+
+    if "final_amount" in orders.columns:
+        total_revenue = orders["final_amount"].sum()
+        average_order_value = orders["final_amount"].mean()
+    else:
+        total_revenue = np.nan
+        average_order_value = np.nan
+
+    print("\nORDER METRICS")
+    print("Total orders:", total_orders)
+    print("Total customers:", total_customers)
+    print("Total revenue:", total_revenue)
+    print("Average order value:", average_order_value)
+
+
+# ------------------------------------------------------------
+# 16. MONTHLY REVENUE TREND
+# ------------------------------------------------------------
+
+if not orders.empty and "order_date" in orders.columns:
+
+    revenue_column = (
+        "final_amount"
+        if "final_amount" in orders.columns
+        else "total_amount"
+    )
+
+    monthly_revenue = (
+        orders.assign(
+            month=orders["order_date"].dt.to_period("M").astype(str)
+        )
+        .groupby("month")[revenue_column]
+        .sum()
+        .reset_index(name="revenue")
+    )
+
+    print("\nMONTHLY REVENUE")
+    print(monthly_revenue.head())
+
+
+# ------------------------------------------------------------
+# 17. ORDER STATUS ANALYSIS
+# ------------------------------------------------------------
+
+if not orders.empty and "status" in orders.columns:
+
+    status_summary = (
+        orders.groupby("status")
+        .agg(
+            orders=("order_id", "nunique"),
+            revenue=(revenue_column, "sum")
+        )
+        .reset_index()
+        .sort_values("revenue", ascending=False)
+    )
+
+    print("\nORDER STATUS SUMMARY")
+    print(status_summary)
+
+
+# ------------------------------------------------------------
+# 18. PAYMENT METHOD ANALYSIS
+# ------------------------------------------------------------
+
+if not orders.empty and "payment_method" in orders.columns:
+
+    payment_summary = (
+        orders.groupby("payment_method")
+        .agg(
+            orders=("order_id", "nunique"),
+            revenue=(revenue_column, "sum")
+        )
+        .reset_index()
+        .sort_values("revenue", ascending=False)
+    )
+
+    print("\nPAYMENT METHOD SUMMARY")
+    print(payment_summary)
+
+
+# ------------------------------------------------------------
+# 19. CITY ANALYSIS
+# ------------------------------------------------------------
+
+if not orders.empty and "delivery_address" in orders.columns:
+    print("\nDelivery-address field detected.")
+    print(orders["delivery_address"].head())
+
+
+if not users.empty and "city" in users.columns:
+
+    city_summary = (
+        users.groupby("city")
+        .agg(
+            customers=("user_id", "nunique")
+        )
+        .reset_index()
+        .sort_values("customers", ascending=False)
+    )
+
+    print("\nCUSTOMERS BY CITY")
+    print(city_summary.head(20))
+
+
+# ------------------------------------------------------------
+# 20. ORDER ITEMS ANALYSIS
+# ------------------------------------------------------------
+
+if not order_items.empty:
+
+    quantity_sold = order_items["quantity"].sum()
+
+    if "total_price" in order_items.columns:
+        item_revenue = order_items["total_price"].sum()
+    else:
+        item_revenue = (
+            order_items["quantity"] * order_items["unit_price"]
+        ).sum()
+
+    print("\nORDER ITEM METRICS")
+    print("Quantity sold:", quantity_sold)
+    print("Order-item revenue:", item_revenue)
+
+
+# ------------------------------------------------------------
+# 21. TOP SELLING PRODUCTS
+# ------------------------------------------------------------
+
+if (
+    not order_items.empty
+    and not products.empty
+    and "product_id" in order_items.columns
+    and "product_id" in products.columns
+):
+
+    product_sales = (
+        order_items.groupby("product_id")
+        .agg(
+            quantity_sold=("quantity", "sum")
+        )
+        .reset_index()
+    )
+
+    if "total_price" in order_items.columns:
+        revenue_by_product = (
+            order_items.groupby("product_id")["total_price"]
+            .sum()
+            .reset_index(name="revenue")
+        )
+
+        product_sales = product_sales.merge(
+            revenue_by_product,
+            on="product_id",
+            how="left"
+        )
+
+    product_sales = product_sales.merge(
+        products[["product_id", "product_name", "category", "price"]],
+        on="product_id",
+        how="left"
+    )
+
+    top_selling_products = (
+        product_sales
+        .sort_values("quantity_sold", ascending=False)
+        .head(10)
+    )
+
+    print("\nTOP 10 SELLING PRODUCTS")
+    print(top_selling_products)
+
+
+# ------------------------------------------------------------
+# 22. PRODUCT REVENUE
+# ------------------------------------------------------------
+
+if "product_sales" in locals():
+
+    top_revenue_products = (
+        product_sales
+        .sort_values("revenue", ascending=False)
+        .head(10)
+    )
+
+    print("\nTOP PRODUCTS BY REVENUE")
+    print(top_revenue_products)
+
+
+# ------------------------------------------------------------
+# 23. REVENUE BY CATEGORY
+# ------------------------------------------------------------
+
+if (
+    "product_sales" in locals()
+    and "category" in product_sales.columns
+):
+
+    revenue_by_category = (
+        product_sales.groupby("category")["revenue"]
+        .sum()
+        .reset_index()
+        .sort_values("revenue", ascending=False)
+    )
+
+    print("\nREVENUE BY CATEGORY")
+    print(revenue_by_category)
+
+
+# ------------------------------------------------------------
+# 24. VENDOR REVENUE ANALYSIS
+# ------------------------------------------------------------
+
+if (
+    not order_items.empty
+    and not vendors.empty
+    and "vendor_id" in order_items.columns
+    and "vendor_id" in vendors.columns
+):
+
+    vendor_revenue = (
+        order_items.groupby("vendor_id")
+        .agg(
+            quantity_sold=("quantity", "sum")
+        )
+        .reset_index()
+    )
+
+    if "total_price" in order_items.columns:
+        vendor_revenue["revenue"] = (
+            order_items.groupby("vendor_id")["total_price"]
+            .sum()
+            .values
+        )
+
+    vendor_revenue = vendor_revenue.merge(
+        vendors[["vendor_id", "vendor_name"]],
+        on="vendor_id",
+        how="left"
+    )
+
+    top_vendors = (
+        vendor_revenue
+        .sort_values("revenue", ascending=False)
+        .head(10)
+    )
+
+    print("\nTOP 10 VENDORS BY REVENUE")
+    print(top_vendors)
+
+
+# ------------------------------------------------------------
+# 25. REVIEWS & RATINGS ANALYSIS
+# ------------------------------------------------------------
+
+if not reviews.empty and "rating" in reviews.columns:
+
+    average_rating = reviews["rating"].mean()
+
+    rating_distribution = (
+        reviews["rating"]
+        .value_counts()
+        .sort_index()
+        .reset_index()
+    )
+
+    rating_distribution.columns = ["rating", "review_count"]
+
+    print("\nRATING METRICS")
+    print("Average rating:", average_rating)
+    print(rating_distribution)
+
+
+# ------------------------------------------------------------
+# 26. PRODUCT RATING ANALYSIS
+# ------------------------------------------------------------
+
+if (
+    not reviews.empty
+    and not products.empty
+    and "product_id" in reviews.columns
+    and "product_id" in products.columns
+):
+
+    product_ratings = (
+        reviews.groupby("product_id")
+        .agg(
+            average_rating=("rating", "mean"),
+            review_count=("rating", "count")
+        )
+        .reset_index()
+    )
+
+    product_ratings = product_ratings.merge(
+        products[["product_id", "product_name", "category"]],
+        on="product_id",
+        how="left"
+    )
+
+    top_rated_products = (
+        product_ratings
+        .query("review_count >= 5")
+        .sort_values(
+            ["average_rating", "review_count"],
+            ascending=[False, False]
+        )
+        .head(10)
+    )
+
+    print("\nTOP RATED PRODUCTS")
+    print(top_rated_products)
+
+
+# ------------------------------------------------------------
+# 27. PRICE ANALYSIS
+# ------------------------------------------------------------
+
+if not products.empty:
+
+    price_statistics = products["price"].describe()
+
+    print("\nPRICE STATISTICS")
+    print(price_statistics)
+
+
+# ------------------------------------------------------------
+# 28. PROFIT / MARGIN ANALYSIS
+# ------------------------------------------------------------
+
+if (
+    not products.empty
+    and "price" in products.columns
+    and "cost_price" in products.columns
+):
+
+    products["unit_margin"] = (
+        products["price"] - products["cost_price"]
+    )
+
+    products["margin_percent"] = np.where(
+        products["price"] != 0,
+        products["unit_margin"] / products["price"] * 100,
+        0
+    )
+
+    products["potential_inventory_margin"] = (
+        products["unit_margin"] * products["stock"]
+    )
+
+    print("\nMARGIN ANALYSIS")
+    print(
+        products[
+            [
+                "product_id",
+                "product_name",
+                "price",
+                "cost_price",
+                "unit_margin",
+                "margin_percent",
+            ]
+        ].head()
+    )
+
+
+# ------------------------------------------------------------
+# 29. HIGH VALUE PRODUCTS
+# ------------------------------------------------------------
+
+if not products.empty and "inventory_value" in products.columns:
+
+    high_inventory_products = (
+        products[
+            [
+                "product_id",
+                "product_name",
+                "category",
+                "stock",
+                "price",
+                "inventory_value",
+            ]
+        ]
+        .sort_values("inventory_value", ascending=False)
+        .head(20)
+    )
+
+    print("\nHIGH INVENTORY VALUE PRODUCTS")
+    print(high_inventory_products)
+
+
+# ------------------------------------------------------------
+# 30. EXPORT CLEANED DATA TO EXCEL
+# ------------------------------------------------------------
+
+excel_path = OUTPUT_DIR / "marketplace_cleaned_analysis.xlsx"
+
+with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+
+    for name, df in data.items():
+        df.to_excel(
+            writer,
+            sheet_name=name[:31],
+            index=False
+        )
+
+    if "category_summary" in locals():
+        category_summary.to_excel(
+            writer,
+            sheet_name="Category_Summary",
+            index=False
+        )
+
+    if "monthly_revenue" in locals():
+        monthly_revenue.to_excel(
+            writer,
+            sheet_name="Monthly_Revenue",
+            index=False
+        )
+
+    if "top_selling_products" in locals():
+        top_selling_products.to_excel(
+            writer,
+            sheet_name="Top_Products",
+            index=False
+        )
+
+    if "top_vendors" in locals():
+        top_vendors.to_excel(
+            writer,
+            sheet_name="Top_Vendors",
+            index=False
+        )
+
+    if "low_stock_products" in locals():
+        low_stock_products.to_excel(
+            writer,
+            sheet_name="Low_Stock",
+            index=False
+        )
+
+print("\nExcel exported to:")
+print(excel_path.resolve())
+
+
+# ------------------------------------------------------------
+# 31. EXPORT IMPORTANT ANALYSIS FILES AS CSV
+# ------------------------------------------------------------
+
+exports = {
+    "monthly_revenue.csv": locals().get("monthly_revenue"),
+    "top_selling_products.csv": locals().get("top_selling_products"),
+    "top_vendors.csv": locals().get("top_vendors"),
+    "low_stock_products.csv": locals().get("low_stock_products"),
+    "category_summary.csv": locals().get("category_summary"),
+}
+
+for filename, df in exports.items():
+
+    if isinstance(df, pd.DataFrame):
+        df.to_csv(
+            OUTPUT_DIR / filename,
+            index=False
+        )
+
+print("\nCSV analysis files exported.")
+
+
+# ------------------------------------------------------------
+# 32. VISUALIZATION: MONTHLY REVENUE
+# ------------------------------------------------------------
+
+if "monthly_revenue" in locals() and not monthly_revenue.empty:
+
+    plt.figure(figsize=(14, 6))
+
+    plt.plot(
+        monthly_revenue["month"],
+        monthly_revenue["revenue"]
+    )
+
+    plt.title("Monthly Revenue Trend")
+    plt.xlabel("Month")
+    plt.ylabel("Revenue")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    plt.savefig(
+        OUTPUT_DIR / "monthly_revenue_trend.png",
+        dpi=200
+    )
+
+    plt.show()
+
+
+# ------------------------------------------------------------
+# 33. VISUALIZATION: TOP PRODUCTS
+# ------------------------------------------------------------
+
+if "top_selling_products" in locals():
+
+    chart_data = top_selling_products.sort_values(
+        "quantity_sold"
+    )
+
+    plt.figure(figsize=(10, 6))
+
+    plt.barh(
+        chart_data["product_name"].astype(str),
+        chart_data["quantity_sold"]
+    )
+
+    plt.title("Top Selling Products")
+    plt.xlabel("Quantity Sold")
+    plt.ylabel("Product")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        OUTPUT_DIR / "top_selling_products.png",
+        dpi=200
+    )
+
+    plt.show()
+
+
+# ------------------------------------------------------------
+# 34. VISUALIZATION: REVENUE BY CATEGORY
+# ------------------------------------------------------------
+
+if "revenue_by_category" in locals():
+
+    plt.figure(figsize=(10, 6))
+
+    plt.bar(
+        revenue_by_category["category"].astype(str),
+        revenue_by_category["revenue"]
+    )
+
+    plt.title("Revenue by Category")
+    plt.xlabel("Category")
+    plt.ylabel("Revenue")
+    plt.xticks(rotation=45)
+
+    plt.tight_layout()
+
+    plt.savefig(
+        OUTPUT_DIR / "revenue_by_category.png",
+        dpi=200
+    )
+
+    plt.show()
+
+
+# ------------------------------------------------------------
+# 35. VISUALIZATION: INVENTORY STATUS
+# ------------------------------------------------------------
+
+if not products.empty and "inventory_status" in products.columns:
+
+    inventory_counts = (
+        products["inventory_status"]
+        .value_counts()
+    )
+
+    plt.figure(figsize=(7, 7))
+
+    plt.pie(
+        inventory_counts.values,
+        labels=inventory_counts.index,
+        autopct="%1.1f%%"
+    )
+
+    plt.title("Inventory Status")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        OUTPUT_DIR / "inventory_status.png",
+        dpi=200
+    )
+
+    plt.show()
+
+
+# ------------------------------------------------------------
+# 36. VISUALIZATION: PRICE VS REVENUE
+# ------------------------------------------------------------
+
+if (
+    "product_sales" in locals()
+    and "price" in product_sales.columns
+    and "revenue" in product_sales.columns
+):
+
+    plt.figure(figsize=(10, 6))
+
+    plt.scatter(
+        product_sales["price"],
+        product_sales["revenue"],
+        alpha=0.5
+    )
+
+    plt.title("Price vs Revenue")
+    plt.xlabel("Product Price")
+    plt.ylabel("Revenue")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        OUTPUT_DIR / "price_vs_revenue.png",
+        dpi=200
+    )
+
+    plt.show()
+
+
+# ------------------------------------------------------------
+# 37. FINAL PROJECT SUMMARY
+# ------------------------------------------------------------
+
+print("\n" + "=" * 70)
+print("MARKETPLACE ANALYTICS PROJECT COMPLETED")
+print("=" * 70)
+
+print("""
+Python tasks completed:
+1. CSV data ingestion
+2. Data inspection
+3. Column-name standardization
+4. Duplicate removal
+5. Date conversion
+6. Numeric conversion
+7. Missing-value handling
+8. Data-quality checks
+9. Product analysis
+10. Inventory analysis
+11. Order analysis
+12. Revenue trend analysis
+13. Customer analysis
+14. Product sales analysis
+15. Vendor revenue analysis
+16. Category analysis
+17. Review and rating analysis
+18. Price and margin analysis
+19. Low-stock detection
+20. Excel/CSV export
+21. Data visualization
+
+Power BI is then used for:
+- Executive KPI dashboard
+- Sales & Product Performance
+- Product Performance & Inventory
+- DAX measures
+- Interactive slicers
+- Drill-through/filtering
+- Business intelligence reporting
+""")
+
+print("Output folder:", OUTPUT_DIR.resolve())
+'''
+
+path = Path("/mnt/data/Marketplace_Analytics_All_Python_Codes.py")
+path.write_text(code, encoding="utf-8")
+
+# Also create a plain-text copy for easy viewing/copying.
+txt_path = Path("/mnt/data/Marketplace_Analytics_All_Python_Codes.txt")
+txt_path.write_text(code, encoding="utf-8")
+
+print(f"Created: {path}")
+print(f"Created: {txt_path}")
