@@ -1,3 +1,127 @@
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+out = "/mnt/data/Marketplace_Analytics_All_Excel_Work.xlsx"
+
+wb = Workbook()
+ws = wb.active
+ws.title = "Excel Project Guide"
+
+# Theme
+title_fill = PatternFill("solid", fgColor="1F4E78")
+section_fill = PatternFill("solid", fgColor="D9EAF7")
+header_fill = PatternFill("solid", fgColor="5B9BD5")
+white_font = Font(color="FFFFFF", bold=True)
+bold = Font(bold=True)
+thin = Side(style="thin", color="B7B7B7")
+
+# Sheet 1
+rows = [
+    ["MARKETPLACE ANALYTICS – COMPLETE EXCEL WORK", "", "", ""],
+    ["Purpose", "Excel was used for data inspection, cleaning, calculations, lookups, conditional logic, summaries and dashboard preparation.", "", ""],
+    ["Dataset", "users, vendors, products, orders, order_items, reviews", "", ""],
+    ["Important note", "The main interactive dashboard was built in Power BI; Excel supports preparation, validation and analysis.", "", ""],
+    ["", "", "", ""],
+    ["WORKFLOW", "STEP", "WHAT WAS DONE", "EXCEL FEATURE"],
+    ["1", "Data Import", "Imported CSV tables into Excel", "Get Data / Power Query"],
+    ["2", "Data Cleaning", "Checked blanks, duplicates, formats and data types", "Filters / Remove Duplicates / Power Query"],
+    ["3", "Calculated Fields", "Created revenue, inventory value and status logic", "Formulas"],
+    ["4", "Lookups", "Connected product/vendor/customer information", "VLOOKUP / INDEX-MATCH"],
+    ["5", "Conditional Logic", "Created stock/status classifications", "IF / AND / OR"],
+    ["6", "Aggregation", "Calculated revenue, orders, stock and counts", "SUMIFS / COUNTIFS / AVERAGEIFS"],
+    ["7", "Pivot Analysis", "Summarized sales, category and vendor performance", "Pivot Tables"],
+    ["8", "Validation", "Compared totals and checked anomalies", "Reconciliation / Filters"],
+]
+for r in rows:
+    ws.append(r)
+
+# Sheet 2: Data dictionary
+wd = wb.create_sheet("Data Dictionary")
+wd.append(["TABLE", "COLUMN", "TYPE", "BUSINESS USE"])
+dictionary = {
+    "users": ["user_id","name","email","phone","city","state","country","registration_date","is_active"],
+    "vendors": ["vendor_id","vendor_name","contact_email","city","gst_number","commission_rate","verified","created_date"],
+    "products": ["product_id","vendor_id","product_name","category","subcategory","price","cost_price","stock","created_date","is_active"],
+    "orders": ["order_id","user_id","order_date","total_amount","discount_amount","final_amount","status","delivery_address","payment_method","created_at"],
+    "order_items": ["order_item_id","order_id","product_id","vendor_id","quantity","unit_price","discount_percent","total_price"],
+    "reviews": ["review_id","product_id","user_id","order_id","rating","review_title","review_text","verified_purchase","helpful_count","created_date"],
+}
+for table, cols in dictionary.items():
+    for c in cols:
+        typ = "Date" if "date" in c or c == "created_at" else ("Numeric" if c in {
+            "price","cost_price","stock","commission_rate","total_amount","discount_amount","final_amount",
+            "quantity","unit_price","discount_percent","total_price","rating","helpful_count"
+        } else "Text/ID")
+        use = {
+            "price":"Selling price","cost_price":"Cost basis","stock":"Inventory quantity",
+            "final_amount":"Net order revenue","rating":"Customer rating","quantity":"Units sold",
+            "category":"Product grouping","vendor_id":"Vendor relationship","user_id":"Customer relationship"
+        }.get(c,"Dimension / identifier")
+        wd.append([table,c,typ,use])
+
+# Sheet 3: formulas
+wf = wb.create_sheet("Excel Formulas")
+wf.append(["AREA","FORMULA / METHOD","PURPOSE","EXAMPLE"])
+formula_rows = [
+    ["Revenue","=SUM(orders[final_amount])","Total revenue","3.64bn in project dashboard"],
+    ["Total Orders","=COUNTA(orders[order_id])","Count orders","Use unique order IDs if duplicates exist"],
+    ["Customers","=COUNTA(UNIQUE(orders[user_id]))","Distinct customers","If UNIQUE is unavailable, use Pivot Table Distinct Count"],
+    ["Average Order Value","=AVERAGE(orders[final_amount])","Average order value","Revenue per order"],
+    ["Inventory Value","=products[price]*products[stock]","Value of current stock","Calculated column"],
+    ["Inventory Status","=IF([@stock]<20,\"Low Stock\",\"Available\")","Stock alert classification","Matches Power BI logic"],
+    ["Out of Stock","=IF([@stock]<=0,\"Out of Stock\",\"In Stock\")","Identify unavailable products","Calculated column"],
+    ["VLOOKUP Vendor","=VLOOKUP([@vendor_id],vendors[[vendor_id]:[vendor_name]],2,FALSE)","Bring vendor name into product/order data","Works without XLOOKUP"],
+    ["VLOOKUP Product","=VLOOKUP([@product_id],products[[product_id]:[product_name]],2,FALSE)","Bring product name into order items","Exact match"],
+    ["INDEX-MATCH","=INDEX(products[product_name],MATCH([@product_id],products[product_id],0))","Alternative lookup","Useful when lookup column is not first"],
+    ["Category Revenue","=SUMIFS(orders[final_amount],orders[status],\"confirmed\")","Revenue by condition","Extend with category after joining data"],
+    ["Confirmed Orders","=COUNTIFS(orders[status],\"confirmed\")","Count confirmed orders","Conditional count"],
+    ["Low Stock Count","=COUNTIFS(products[stock],\"<20\")","Number of low-stock products","Inventory KPI"],
+    ["Average Price","=AVERAGE(products[price])","Average selling price","Product KPI"],
+    ["Highest Price","=MAX(products[price])","Maximum product price","Pricing analysis"],
+    ["Lowest Price","=MIN(products[price])","Minimum product price","Pricing analysis"],
+    ["Rating Average","=AVERAGE(reviews[rating])","Average customer rating","Review KPI"],
+    ["Revenue Check","=SUM(orders[final_amount])","Reconcile with Power BI total","Cross-check"],
+]
+for r in formula_rows:
+    wf.append(r)
+
+# Sheet 4: pivot tables
+wp = wb.create_sheet("Pivot Tables")
+wp.append(["PIVOT TABLE", "ROWS", "VALUES", "FILTERS / SLICERS", "INSIGHT"])
+pivot_rows = [
+    ["Sales by Category","category","Sum of Revenue","status, date","Which categories generate most revenue"],
+    ["Vendor Performance","vendor_name","Sum of Revenue","date","Top vendors by revenue"],
+    ["Product Performance","product_name","Sum of quantity / Sum of revenue","category","Best-selling products"],
+    ["Monthly Revenue","order_date grouped by Month","Sum of final_amount","status","Revenue trend"],
+    ["Order Status","status","Count of order_id, Sum of final_amount","date","Confirmed/cancelled performance"],
+    ["Inventory by Category","category","Sum of stock, Sum of inventory value","inventory status","Inventory concentration"],
+    ["Stock Alerts","inventory_status","Count of product_id","category, vendor","Low-stock monitoring"],
+    ["Ratings","rating","Count of review_id / Average rating","category, product","Customer sentiment proxy"],
+    ["Payment Method","payment_method","Count of order_id, Sum of revenue","date, status","Payment mix"],
+    ["Customer City","city","Count of orders / Sum of revenue","date","Geographic
+
+
+
+
+
+
+Afer this Python
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 from pathlib import Path
 
