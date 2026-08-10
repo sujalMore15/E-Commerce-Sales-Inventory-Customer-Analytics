@@ -1,1 +1,178 @@
 
+
+SHOW TABLES;
+
+
+CREATE TABLE users (
+    user_id INT PRIMARY KEY,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    registration_date DATE,
+    is_active BOOLEAN
+);
+
+SHOW TABLES;
+
+CREATE TABLE vendors (
+    vendor_id INT PRIMARY KEY,
+    vendor_name VARCHAR(100),
+    contact_name VARCHAR(100),
+    email VARCHAR(100),
+    phone VARCHAR(20),
+    city VARCHAR(100),
+    state VARCHAR(100),
+    registration_date DATE,
+    rating DECIMAL(3,2)
+);
+SHOW TABLES;
+CREATE TABLE products (
+    product_id INT PRIMARY KEY,
+    vendor_id INT,
+    product_name VARCHAR(255),
+    category VARCHAR(100),
+    brand VARCHAR(100),
+    price DECIMAL(10,2),
+    stock_quantity INT,
+    rating DECIMAL(3,2),
+
+    FOREIGN KEY (vendor_id)
+    REFERENCES vendors(vendor_id)
+);
+
+CREATE TABLE orders (
+    order_id INT PRIMARY KEY,
+    user_id INT,
+    order_date DATETIME,
+    order_status VARCHAR(30),
+    payment_method VARCHAR(50),
+    shipping_city VARCHAR(100),
+    shipping_state VARCHAR(100),
+    total_amount DECIMAL(12,2),
+
+    FOREIGN KEY (user_id)
+    REFERENCES users(user_id)
+);
+
+CREATE TABLE order_items (
+    order_item_id INT PRIMARY KEY,
+    order_id INT,
+    product_id INT,
+    quantity INT,
+    unit_price DECIMAL(10,2),
+    subtotal DECIMAL(12,2),
+
+    FOREIGN KEY (order_id)
+    REFERENCES orders(order_id),
+
+    FOREIGN KEY (product_id)
+    REFERENCES products(product_id)
+);
+
+SHOW TABLES;
+
+CREATE TABLE reviews (
+    review_id INT PRIMARY KEY,
+    user_id INT,
+    product_id INT,
+    rating INT,
+    review_text TEXT,
+    review_date DATE,
+
+    FOREIGN KEY (user_id)
+    REFERENCES users(user_id),
+
+    FOREIGN KEY (product_id)
+    REFERENCES products(product_id)
+);
+SHOW TABLES;
+DESCRIBE users;
+
+DESCRIBE vendors;
+DESCRIBE products;
+DESCRIBE orders;
+DESCRIBE order_items;
+DESCRIBE reviews;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- LOAD DATA INTO USERS TABLE
+LOAD DATA LOCAL INFILE "C:\Users\DELL\NEW PROJET\users.csv"
+INTO TABLE users
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+#-- LOAD DATA INTO VENDORS TABLE
+LOAD DATA LOCAL INFILE 'C:\\Users\\DELL\\NEW PROJET\\vendors.csv'
+INTO TABLE vendors
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+-- LOAD DATA INTO PRODUCTS TABLE
+LOAD DATA LOCAL INFILE 'C:\\Users\\DELL\\NEW PROJET\\products.csv'
+INTO TABLE products
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+-- LOAD DATA INTO ORDERS TABLE
+LOAD DATA LOCAL INFILE 'C:\\Users\\DELL\\NEW PROJET\\orders.csv'
+INTO TABLE orders
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+-- LOAD DATA INTO ORDER_ITEMS TABLE
+LOAD DATA LOCAL INFILE 'C:\\Users\\DELL\\NEW PROJET\\order_items.csv'
+INTO TABLE order_items
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+-- LOAD DATA INTO REVIEWS TABLE
+LOAD DATA LOCAL INFILE 'C:\\Users\\DELL\\NEW PROJET\\reviews.csv'
+INTO TABLE reviews
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+-- VERIFY DATA LOADED
+SELECT COUNT(*) as total_users FROM users;
+SELECT COUNT(*) as total_vendors FROM vendors;
+SELECT COUNT(*) as total_products FROM products;
+SELECT COUNT(*) as total_orders FROM orders;
+SELECT COUNT(*) as total_order_items FROM order_items;
+SELECT COUNT(*) as total_reviews FROM reviews;
+
+
+select * from order_items ;
+select * from orders;
+select * from reviews;
+select * from vendors;
+select * from users;
+select * from products;
+select * from reviews
+
